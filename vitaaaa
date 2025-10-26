@@ -1,0 +1,28 @@
+export default async function handler(req, res) {
+  // TROQUE pelo SEU URL de Apps Script (termina com /exec)
+  const FORWARD_TO = 'https://script.google.com/macros/s/AKfycbwxbdddmN9GTFiy0hHaqJ3IaHt9y6zOshp_dM7pM9SqwelzRDHxLrX4ux8H_YZ5qTEY/exec';
+
+  const upstreamUrl = new URL(FORWARD_TO);
+
+  // mantém query (?health=1, ?list=1...)
+  const hasQuery = req.url.includes('?');
+  if (hasQuery) upstreamUrl.search = req.url.split('?')[1];
+
+  // replica método e corpo
+  const init = { method: req.method, headers: { 'content-type': 'text/plain;charset=UTF-8' } };
+
+  if (!['GET','HEAD','OPTIONS'].includes(req.method)) {
+    const body = await new Promise(resolve => {
+      let data=''; req.on('data', c => data+=c); req.on('end', () => resolve(data));
+    });
+    init.body = body;
+  }
+
+  const upstream = await fetch(upstreamUrl, init);
+  const text = await upstream.text();
+
+  // CORS liberado (frente web consegue chamar)
+  res.setHeader('access-control-allow-origin', '*');
+  res.setHeader('content-type', upstream.headers.get('content-type') || 'application/json; charset=UTF-8');
+  res.status(upstream.status).send(text);
+}
